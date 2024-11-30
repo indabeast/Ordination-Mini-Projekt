@@ -53,4 +53,20 @@ public class ServiceTest
 
         Console.WriteLine("Her kommer der ikke en exception. Testen fejler.");
     }
+    
+    [TestMethod]
+    public void ValidOrdinationDates_ShouldPass()
+    {
+        // Arrange
+        var patient = service.GetPatienter().First();
+        var lm = service.GetLaegemidler().First();
+
+        // Act
+        var ordination = service.OpretDagligFast(patient.PatientId, lm.LaegemiddelId,
+            1, 1, 1, 1, new DateTime(2024, 11, 1), new DateTime(2024, 11, 10));
+
+        // Assert
+        Assert.IsNotNull(ordination);
+    }
+
 }

@@ -149,41 +149,22 @@ public class DataService
     public PN OpretPN(int patientId, int laegemiddelId, double antal, DateTime startDato, DateTime slutDato)
     {
 
-        if (patientId < 0 || laegemiddelId < 0 || antal<0 || startDato > slutDato)
+        if (patientId < 0 || laegemiddelId < 0 || antal <= 0 || startDato > slutDato)
         {
-            throw new InvalidOperationException("id'er skal være større end 0, antal skal være større end 0 og startdato skal være før slutdato");
-            return null;
+            throw new ArgumentException("Invalid input: IDs must be non-negative, amount must be positive, and start date must precede end date.");
         }
-        else
-        {
-            Patient p;
-            Laegemiddel lm;
 
-            try
-            {
-                lm = db.Laegemiddler.First(lm => lm.LaegemiddelId == laegemiddelId);
-            }
+        var laegemiddel = db.Laegemiddler.FirstOrDefault(lm => lm.LaegemiddelId == laegemiddelId)
+                          ?? throw new InvalidOperationException("Lægemiddel findes ikke.");
 
-            catch
-            {
-                throw new InvalidOperationException("lægemiddel findes ikke");
-            }
+        var patient = db.Patienter.FirstOrDefault(p => p.PatientId == patientId)
+                      ?? throw new InvalidOperationException("Patient findes ikke.");
 
-            try
-            {
-                p = db.Patienter.First(p => p.PatientId == patientId);
-            }
-            catch (InvalidOperationException)
-            {
-                throw new InvalidOperationException("patient findes ikke");
-            }
+        var newPN = new PN(startDato, slutDato, antal, laegemiddel);
+        patient.ordinationer.Add(newPN);
 
-            PN addPN = new PN(startDato, slutDato, antal, GetLaegemiddel(laegemiddelId));
-            p.ordinationer.Add(addPN);
-            db.SaveChanges();
-
-            return addPN!;
-        }
+        db.SaveChanges();
+        return newPN;
       
         
     }
@@ -194,90 +175,64 @@ public class DataService
 
         if (patientId < 0 || laegemiddelId < 0 || startDato > slutDato)
         {
-            throw new InvalidOperationException("id'er skal være større end 0 og startdato skal være før slutdato");
-            return null;
+            throw new ArgumentException("Invalid input: IDs must be non-negative, and start date must precede end date.");
         }
-        else
-        {
-            Patient p;
-            Laegemiddel lm;
-            try
-            {
-                lm = db.Laegemiddler.First(lm => lm.LaegemiddelId == laegemiddelId);
-            }
 
-            catch
-            {
-                throw new InvalidOperationException("lægemiddel findes ikke");
-                
-            }
-            try
-            {
-                p = db.Patienter.First(p => p.PatientId == patientId);
-            }
-            catch (InvalidOperationException)
-            {
-                throw new InvalidOperationException("patient findes ikke");
-            }
-            DagligFast addDagligFast = new DagligFast(startDato, slutDato, lm, antalMorgen, antalMiddag, antalAften, antalNat);
-            p.ordinationer.Add(addDagligFast);
-            db.SaveChanges();
-            return addDagligFast!;
+        if (antalMorgen + antalMiddag + antalAften + antalNat > 4)
+        {
+            throw new InvalidOperationException("DagligFast ordination må ikke overstige 4 doser pr. døgn (morgen, middag, aften, nat).");
         }
+
+        var laegemiddel = db.Laegemiddler.FirstOrDefault(lm => lm.LaegemiddelId == laegemiddelId)
+                          ?? throw new InvalidOperationException("Lægemiddel findes ikke.");
+
+        var patient = db.Patienter.FirstOrDefault(p => p.PatientId == patientId)
+                      ?? throw new InvalidOperationException("Patient findes ikke.");
+
+        var newDagligFast = new DagligFast(startDato, slutDato, laegemiddel, antalMorgen, antalMiddag, antalAften, antalNat);
+        patient.ordinationer.Add(newDagligFast);
+
+        db.SaveChanges();
+        return newDagligFast;
             
     }
 
     public DagligSkæv OpretDagligSkaev(int patientId, int laegemiddelId, Dosis[] doser, DateTime startDato, DateTime slutDato)
     {
-        if (patientId < 0 || laegemiddelId < 0 || doser.Length == 0 || startDato > slutDato)
+        if (patientId < 0 || laegemiddelId < 0 || doser == null || doser.Length == 0 || startDato > slutDato)
         {
-            throw new InvalidOperationException("Id kan ikke være et negativt integer");
-            return null;
+            throw new ArgumentException("Invalid input: IDs must be non-negative, doser cannot be empty, and start date must precede end date.");
         }
-        else
-        {
-            Patient p;
-            Laegemiddel lm;
 
-            try
-            {
-                lm = db.Laegemiddler.First(lm => lm.LaegemiddelId == laegemiddelId);
-            }
+        var laegemiddel = db.Laegemiddler.FirstOrDefault(lm => lm.LaegemiddelId == laegemiddelId)
+                          ?? throw new InvalidOperationException("Lægemiddel findes ikke.");
 
-            catch
-            {
-                throw new InvalidOperationException("lægemiddel findes ikke");
-            }
+        var patient = db.Patienter.FirstOrDefault(p => p.PatientId == patientId)
+                      ?? throw new InvalidOperationException("Patient findes ikke.");
 
-            try
-            {
-                p = db.Patienter.First(p => p.PatientId == patientId);
-            }
-            catch (InvalidOperationException)
-            {
-                throw new InvalidOperationException("patient findes ikke");
-            }
-            DagligSkæv addDagligSkæv = new DagligSkæv(startDato, slutDato, GetLaegemiddel(laegemiddelId), doser);
-            p.ordinationer.Add(addDagligSkæv);
-            db.SaveChanges();
-            return addDagligSkæv!;
+        var newDagligSkæv = new DagligSkæv(startDato, slutDato, laegemiddel, doser);
+        patient.ordinationer.Add(newDagligSkæv);
 
-        }
+        db.SaveChanges();
+        return newDagligSkæv;
     }
 
     public string AnvendOrdination(int id, Dato dato)
     {
-        PN pn = db.PNs.Find(id);
+        var pn = db.PNs.Find(id) 
+                 ?? throw new InvalidOperationException("Ordination findes ikke.");
+
         bool anvendtOrdination = pn.givDosis(dato);
+
         if (anvendtOrdination)
         {
             db.SaveChanges();
-            return "Ordinationen er anvendt";
+            return "Ordinationen er anvendt.";
         }
         else
-        
-            return "Ordinationen er ikke anvendt";
-        
+        {
+            return "Ordinationen er ikke anvendt.";
+        }
     }
 
     /// <summary>
@@ -288,20 +243,17 @@ public class DataService
     /// <param name="laegemiddel"></param>
     /// <returns></returns>
 	public double GetAnbefaletDosisPerDøgn(int patientId, int laegemiddelId) {
-        Laegemiddel laegemiddel = GetLaegemiddel(laegemiddelId);
-        Patient patient = db.Patienter.Find(patientId);
-        if (laegemiddel != null && patient != null)
+        var laegemiddel = GetLaegemiddel(laegemiddelId) 
+                          ?? throw new InvalidOperationException("Lægemiddel findes ikke.");
+
+        var patient = db.Patienter.Find(patientId)
+                      ?? throw new InvalidOperationException("Patient findes ikke.");
+
+        return patient.vaegt switch
         {
-            if (patient.vaegt < 25)
-            {
-                return laegemiddel.enhedPrKgPrDoegnLet * patient.vaegt;
-            }
-            else if (patient.vaegt <= 120)
-            {
-                return laegemiddel.enhedPrKgPrDoegnNormal * patient.vaegt;
-            }
-            else return laegemiddel.enhedPrKgPrDoegnTung * patient.vaegt;
-        }
-        return -1;
+            < 25 => laegemiddel.enhedPrKgPrDoegnLet * patient.vaegt,
+            <= 120 => laegemiddel.enhedPrKgPrDoegnNormal * patient.vaegt,
+            _ => laegemiddel.enhedPrKgPrDoegnTung * patient.vaegt
+        };
     }
 }
